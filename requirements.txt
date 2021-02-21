@@ -1,0 +1,6 @@
+Pillow
+fpdf
+pyautogui
+numpy
+opencv
+ocrmypdf

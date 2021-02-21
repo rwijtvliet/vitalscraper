@@ -1,0 +1,16 @@
+{
+    "python.pythonPath": "/home/ruud/syncNone/Software_Installed/anaconda/envs/vitalsource/bin/python",
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "90"
+    ],
+    
+    "python.linting.flake8Args": [
+        "--max-line-length=90",
+        "--ignore=E402",
+    ],
+    "python.linting.pylintEnabled": false,
+}

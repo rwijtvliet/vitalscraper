@@ -1,26 +1,28 @@
 """
-Module to take screenshots of vitalsource books.
+Module to take screenshots of vitalsource books and turn them into PDFs.
+
+How-to:
+. Open vitalsource bookshelf application
+. Open book you want to turn into pdf
+. Follow instructions below
 """
 
-#%%
 from pathlib import Path
-from typing import Dict
 from PIL import Image
 from fpdf import FPDF
 import pyautogui as pa
 import numpy as np
-import pandas as pd
 import datetime as dt
 import time
 import cv2
-import ocrmypdf
 
-pa.PAUSE = 0.1
+pa.PAUSE = 1.5
+# seconds between each pyautogui command, to give user time to react if things go wrong.
 pa.FAILSAFE = True
 
-#%% Setting up and calibrating.
+# %% Setting up and calibrating.
 
-# Positions on screen.
+# Positions on screen.test
 
 preset = "laptop"
 
@@ -29,28 +31,32 @@ presets = {
         "page": np.array([225, 1175]),
         "screen": np.array([320, 85, 1437, 1050]),
     },
-    "laptop": {"page": np.array([219, 1060]), "screen": np.array([321, 85, 1441, 930])},
+    "laptop": {
+        "page": np.array([219, 1060]),
+        "screen": np.array([321, 85, 1441, 930])
+    },
 }
 
 if preset in presets:
     pos = presets[preset]
 else:  # do interactive
+    pos = {}
     pa.alert(
-        text='Move mouse to position of textbox containing page number, and press "Enter".',
-        title="Calibration",
-        button="OK",
+        'Move mouse to position of textbox containing page number, and press "Enter".',
+        "Calibration",
+        "OK",
     )
     pos["page"] = np.array(pa.position())
     pa.alert(
-        text='Move mouse to top-left position of content area, and press "Enter".',
-        title="Calibration",
-        button="OK",
+        'Move mouse to top-left position of content area, and press "Enter".',
+        "Calibration",
+        "OK",
     )
     topleft = np.array(pa.position())
     pa.alert(
-        text='Move mouse to bottom-right position of content area, and press "Enter".',
-        title="Calibration",
-        button="OK",
+        'Move mouse to bottom-right position of content area, and press "Enter".',
+        "Calibration",
+        "OK",
     )
     bottomright = np.array(pa.position())
     pos["screen"] = np.array([*topleft, *(bottomright - topleft)])
@@ -60,14 +66,8 @@ pos["middle"] = pos["screen"][:2] + 0.5 * pos["screen"][2:]
 
 
 # Path to save to.
-basepath = Path("output4/")
-subs = [
-    ("0_screenshots", ".png"),
-    ("1_png", ".png"),
-    ("2_jpg", ".jpg"),
-    ("3_pdf", ".pdf"),
-    ("4_pdf_searchable", ".pdf"),
-]
+basepath = Path("output3/")
+subs = ["0_screenshots", "1_stitched", "2_pdf", "3_pdf_searchable"]
 
 
 def path(phase: int = 0, pagenum=None, ab=None):
@@ -77,13 +77,10 @@ def path(phase: int = 0, pagenum=None, ab=None):
     if pagenum is None:  # return path to folder
         return p
     else:  # return path to file
-        if phase == 3 or phase == 4:
+        if phase < 2:
+            return p / f"{pagenum:04d}{'' if ab is None else ab}.png"
+        else:
             return p / "result.pdf"
-        filename = f"{pagenum:04d}"
-        if ab is not None:
-            filename += ab
-        suffix = ".jpg" if phase == 2 else ".png"
-        return p / (filename + suffix)
 
 
 for phase in range(len(subs)):
@@ -101,7 +98,7 @@ sleep_time = 2  # seconds
 # How many screenshots per page.
 # . True to take one screenshot per page.
 # . False to take screenshot, scroll down, and take another one.
-#   Each screen must show >= 55% of page so there is overlap for stitching.
+#   Each screen must show >50% of page so there is overlap for stitching.
 singleshot = False
 
 
@@ -153,9 +150,8 @@ print(f"{dt.datetime.now()}: stitching: start.")
 
 # Find overlapping part.
 
-page_stitchtemplate = (
-    4  #  should be a good page to do the stitching; not too much white space.
-)
+#  should be a good page to do the stitching; not too much white space.
+page_stitchtemplate = 4
 
 
 def mse(imageA, imageB):
@@ -177,7 +173,7 @@ h = imga.shape[0]
 find = imga[-10:, 20:-20, :]  # 10 pix tall strip at end
 besterror, besty = np.inf, None
 for y in range(0, h - 10):
-    test = imgb[y : y + 10, 20:-20, :]
+    test = imgb[y:y + 10, 20:-20, :]
     if (error := mse(test, find)) < besterror:
         besterror, besty = error, y
 
@@ -193,51 +189,27 @@ for page in range(pages["first"], pages["last"] + 1):
 
 print(f"{dt.datetime.now()}: stitching: finished.")
 
-
-# %%  Save as jpg.
-
-print(f"{dt.datetime.now()}: jpg: start.")
-
-if singleshot:
-    sourcepath = path(0)
-else:
-    sourcepath = path(1)
-
-for file in sourcepath.iterdir():
-    if file.is_dir():
-        continue
-
-    im = Image.open(file)
-    h, w = im.height, im.width
-    h, w = h - h % 2, w - w % 2  # make even to reduce jpg artefacts
-    im = im.crop((0, 0, w, h))
-    im.save(path(2) / f"{file.stem}.jpg", "JPEG", quality=jpg_quality)
-
-print(f"{dt.datetime.now()}: jpg: finished.")
-
 # %% Save as pdf.
 
 print(f"{dt.datetime.now()}: pdf: start.")
 
 page_sizetemplate = 4
 
-im = Image.open(path(2, page_sizetemplate))
+im = Image.open(path(1, page_sizetemplate))
 pdf = FPDF(unit="pt", format=[im.width, im.height])
-for file in path(2).iterdir():
+for file in sorted(path(1).iterdir()):
     if file.is_dir():
         continue
     pdf.add_page()
     pdf.image(str(file), 0, 0)
-pdf.output(path(3, -1), "F")
+pdf.output(path(2, -1), "F")
 
 print(f"{dt.datetime.now()}: pdf: finished.")
 
-# %% Do OCR to make searchable.
+# %% Do OCR to make searchable, and compress in size.
 
-print(f"{dt.datetime.now()}: ocr: start.")
-
-ocrmypdf.ocr(path(3, -1), path(4, -1))
-
-print(f"{dt.datetime.now()}: ocr: finished.")
+print("Can't reliably do OCR from python script.")
+print("Please run the following line from the terminal:\n")
+print(f"ocrmypdf {path(2, -1).resolve()} {path(3, -1).resolve()}")
 
 # %%
