@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/ruud/syncNone/Software_Installed/anaconda/envs/vitalsource/bin/python",
+    "python.pythonPath": "C:\\Users\\ruud.wijtvliet\\.conda\\envs\\vitalsource\\python.exe",
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
     "python.formatting.provider": "black",

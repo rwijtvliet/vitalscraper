@@ -24,16 +24,17 @@ pa.FAILSAFE = True
 
 # Positions on screen.test
 
-preset = "laptop"
+preset = "bigscreenathome"
 
 presets = {
     "homesetup": {
         "page": np.array([225, 1175]),
         "screen": np.array([320, 85, 1437, 1050]),
     },
-    "laptop": {
-        "page": np.array([219, 1060]),
-        "screen": np.array([321, 85, 1441, 930])
+    "laptop": {"page": np.array([219, 1060]), "screen": np.array([321, 85, 1441, 930])},
+    "bigscreenathome": {
+        "page": np.array([227, 1177]),
+        "screen": np.array([248, 82, 1585, 1055]),
     },
 }
 
@@ -61,18 +62,18 @@ else:  # do interactive
     bottomright = np.array(pa.position())
     pos["screen"] = np.array([*topleft, *(bottomright - topleft)])
     pa.alert(f'Variable "pos":\n{pos}', "Calibration complete")
-    print(f'setup, variable "pos":\n{pos}')
+    print(f'setup, variable "pos":\n{repr(pos)}')
 pos["middle"] = pos["screen"][:2] + 0.5 * pos["screen"][2:]
 
 
 # Path to save to.
-basepath = Path("output3/")
+basepath = Path("output4/")
 subs = ["0_screenshots", "1_stitched", "2_pdf", "3_pdf_searchable"]
 
 
 def path(phase: int = 0, pagenum=None, ab=None):
     """Returns path to folder or file."""
-    subpath, suffix = subs[phase]
+    subpath = subs[phase]
     p = basepath / subpath
     if pagenum is None:  # return path to folder
         return p
@@ -107,11 +108,6 @@ singleshot = False
 pages = {"first": 1, "last": 235}
 
 
-# Quality of stitched jpg.
-
-jpg_quality = 70
-
-
 # %% Take screenshots.
 
 
@@ -143,51 +139,40 @@ print(f"{dt.datetime.now()}: screenshots: finished.")
 
 # %% Stitch.
 
+
+def stitchpages(first: int, last: int, template: int):
+    def mse(imageA, imageB):  # 'Mean Squared Error' (must have same dimension)
+        err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
+        return err / float(imageA.shape[0] * imageA.shape[1])
+
+    # Find overlapping part.
+
+    imga, imgb = [cv2.imread(str(path(0, template, part))) for part in ["a", "b"]]
+    h = imga.shape[0]
+    find = imga[-10:, 20:-20, :]  # 10 pix tall strip at end
+    besterror, besty = np.inf, None
+    for y in range(0, h - 10):
+        test = imgb[y : y + 10, 20:-20, :]
+        if (error := mse(test, find)) < besterror:
+            besterror, besty = error, y
+
+    print(f"{dt.datetime.now()}: stitching: found optimal overlap point.")
+
+    # Do stitching.
+
+    for page in range(first, last + 1):
+        imga, imgb = [cv2.imread(str(path(0, page, part))) for part in ["a", "b"]]
+        img = np.vstack((imga[:-10, :, :], imgb[besty:, :, :]))
+        cv2.imwrite(str(path(1, page)), img)
+
+
 if singleshot:
-    raise ValueError("No stitching required.")
-
-print(f"{dt.datetime.now()}: stitching: start.")
-
-# Find overlapping part.
-
-#  should be a good page to do the stitching; not too much white space.
-page_stitchtemplate = 4
-
-
-def mse(imageA, imageB):
-    # the 'Mean Squared Error' between the two images is the
-    # sum of the squared difference between the two images;
-    # NOTE: the two images must have the same dimension
-    err = np.sum((imageA.astype("float") - imageB.astype("float")) ** 2)
-    err /= float(imageA.shape[0] * imageA.shape[1])
-
-    # return the MSE, the lower the error, the more "similar"
-    # the two images are
-    return err
-
-
-imga, imgb = [
-    cv2.imread(str(path(0, page_stitchtemplate, part))) for part in ["a", "b"]
-]
-h = imga.shape[0]
-find = imga[-10:, 20:-20, :]  # 10 pix tall strip at end
-besterror, besty = np.inf, None
-for y in range(0, h - 10):
-    test = imgb[y:y + 10, 20:-20, :]
-    if (error := mse(test, find)) < besterror:
-        besterror, besty = error, y
-
-
-print(f"{dt.datetime.now()}: stitching: found optimal overlap point.")
-
-# Do stitching.
-
-for page in range(pages["first"], pages["last"] + 1):
-    imga, imgb = [cv2.imread(str(path(0, page, part))) for part in ["a", "b"]]
-    img = np.vstack((imga[:-10, :, :], imgb[besty:, :, :]))
-    cv2.imwrite(str(path(1, page)), img)
-
-print(f"{dt.datetime.now()}: stitching: finished.")
+    print("No stitching required.")
+else:
+    print(f"{dt.datetime.now()}: stitching: start.")
+    stitchpages(1, 2, 1)
+    stitchpages(3, pages["last"], 4)
+    print(f"{dt.datetime.now()}: stitching: finished.")
 
 # %% Save as pdf.
 
