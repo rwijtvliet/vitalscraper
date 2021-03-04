@@ -112,7 +112,7 @@ pages = {"first": 1, "last": 235}
 
 
 print(f"{dt.datetime.now()}: screenshots: start.")
-print("Will start in 5 seconds. Make sure Bookshelf app is visible and behind it!")
+print("Will start in 5 seconds. Make sure Bookshelf app is visible.")
 
 time.sleep(5)
 
